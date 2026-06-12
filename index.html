@@ -196,26 +196,40 @@ pre{font-size:11px;font-family:monospace;color:#555;white-space:pre;line-height:
 </div>
 
 <script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx3X3ZYqFP7JRla4wXN_cka1rrnmDvea57CRBRxYGg-8LMFGPoFoU1-8jI_bAMQW04Abg/exec';
 const SHEET_ID = '1IblVfv7rpGVtk0oWpoGqGBNraMCFsV_nt586iH1VHYY';
 const ADMIN_EMAIL = 'cococrea0@gmail.com';
-const CSV_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/export?format=csv&gid=0';
 
 const DEFAULT_SUBJECT = 'お申し込みありがとうございます';
 const DEFAULT_BODY = `お申し込みありがとうございます。
+下記日時にて承りました。
 
-日時：6月23日　13時～
-場所：これつる会館
-〒230-0051 神奈川県横浜市鶴見区中央４丁目７−１５ ラカンパーナキソヤ 201
+■日時：6月23日　13時～
 
-当日の緊急連絡先：070-9147-7705
+■場所：これつる会館
+神奈川県横浜市鶴見区中央４丁目７−１５
+ラカンパーナキソヤ 201
 
-振込先：楽天銀行（銀行コード 0036）
+JR鶴見駅（東口）より徒歩5分
+京急鶴見駅（東口）より徒歩3分
+
+Googleマップはこちら：
+https://maps.app.goo.gl/MXQUBtdAhCoVu84c6
+
+ひだまり保育園さんが入っている建物の2階になります。
+駅から向かって進行方向の建物奥手にある階段を上り、お入りください。
+
+■振込先：楽天銀行（銀行コード 0036）
 　コンガ支店（支店コード 234）
 　普通口座　3925550
 　ヨコオ　マリ
+金額：1000円
+（お振込み手数料はご負担ください）
 
-当日は気を付けてお越しください。
-お会いできるのを楽しみにしております。`;
+気を付けてお越しください。
+お会いできるのを楽しみにしております。
+ワークショップ運営一同
+（当日の緊急連絡先：070-9147-7705）`;
 
 const gasCode = `const SHEET_ID = '${SHEET_ID}';
 const ADMIN_EMAIL = '${ADMIN_EMAIL}';
@@ -306,40 +320,22 @@ let sessionMailData={};
 async function loadSessions(){
   const sel=document.getElementById('session-select');
   try{
-    const res=await fetch(CSV_URL);
+    const res=await fetch(GAS_URL);
     if(!res.ok) throw new Error();
-    const text=await res.text();
-    const rows=text.trim().split('\n').map(r=>r.split(',').map(c=>c.replace(/^"|"$/g,'').trim()));
-    const header=rows[0];
-    let sCol=-1,subjCol=-1,bodyCol=-1,polCol=-1;
-    header.forEach((h,i)=>{
-      const lh=h.toLowerCase();
-      if(lh.includes('参加回')||lh.includes('回')||lh.includes('session')||lh.includes('date')) sCol=i;
-      if(lh.includes('メール件名')||lh.includes('件名')||lh.includes('subject')) subjCol=i;
-      if(lh.includes('メール本文')||lh.includes('本文')||lh.includes('body')) bodyCol=i;
-      if(lh.includes('キャンセル')||lh.includes('cancel')||lh.includes('policy')) polCol=i;
-    });
-    if(sCol===-1) sCol=1;
-    const sessions=[];
-    for(let i=1;i<rows.length;i++){
-      const r=rows[i];
-      if(!r[sCol]||!r[sCol].trim()) continue;
-      const s=r[sCol];
-      sessions.push(s);
-      sessionMailData[s]={
-        subject: subjCol>=0&&r[subjCol]?r[subjCol]:DEFAULT_SUBJECT,
-        body:    bodyCol>=0&&r[bodyCol]?r[bodyCol].replace(/\\n/g,'\n'):DEFAULT_BODY,
-        policy:  polCol>=0&&r[polCol]?r[polCol]:null,
-      };
-    }
-    if(sessions.length===0){
-      sel.innerHTML='<option value="">— 参加回をスプレッドシートに入力してください —</option>';
+    const json=await res.json();
+    if(!json.sessions||json.sessions.length===0){
+      sel.innerHTML='<option value="">— 設定シートに参加回を入力してください —</option>';
       return;
     }
     sel.innerHTML='<option value="">— 回を選択してください —</option>';
-    sessions.forEach(s=>{
+    json.sessions.forEach(s=>{
       const o=document.createElement('option');
-      o.value=s;o.textContent=s;sel.appendChild(o);
+      o.value=s.session;o.textContent=s.session;sel.appendChild(o);
+      sessionMailData[s.session]={
+        subject: s.subject||DEFAULT_SUBJECT,
+        body:    s.body||DEFAULT_BODY,
+        policy:  s.policy||null,
+      };
     });
     sel.addEventListener('change',()=>{
       const v=sel.value;
@@ -401,11 +397,9 @@ document.getElementById('submit-btn').addEventListener('click',async()=>{
     mailBody:    mailData.body||DEFAULT_BODY,
     defaultBody: DEFAULT_BODY,
   };
-  let gasUrl='';
-  try{ gasUrl=localStorage.getItem(GAS_KEY)||''; }catch(e){}
-  if(gasUrl){
+  if(GAS_URL){
     try{
-      await fetch(gasUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),mode:'no-cors'});
+      await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),mode:'no-cors'});
     }catch(e){}
   }
   setTimeout(()=>{
